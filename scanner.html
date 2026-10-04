@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width,
+initial-scale=1.0,
+maximum-scale=1.0,
+user-scalable=no">
+
+<title>QR Scanner</title>
+
+<script
+src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js">
+</script>
+
+<style>
+
+* {
+  box-sizing:border-box;
+}
+
+body {
+
+  margin:0;
+
+  min-height:100vh;
+
+  background:#f5f7fb;
+
+  color:#111827;
+
+  font-family:Arial,sans-serif;
+
+}
+
+.header {
+
+  padding:22px 15px;
+
+  text-align:center;
+
+}
+
+.header h1 {
+
+  margin:0;
+
+  font-size:28px;
+
+}
+
+#reader {
+
+  width:100%;
+
+  max-width:600px;
+
+  margin:auto;
+
+}
+
+.message {
+
+  text-align:center;
+
+  padding:15px;
+
+  font-size:18px;
+
+}
+
+.success {
+
+  color:#15803d;
+
+  font-weight:bold;
+
+}
+
+.error {
+
+  color:#b91c1c;
+
+  font-weight:bold;
+
+}
+
+button {
+
+  width:90%;
+
+  max-width:540px;
+
+  display:block;
+
+  margin:14px auto;
+
+  padding:20px;
+
+  border:0;
+
+  border-radius:16px;
+
+  font-size:20px;
+
+  font-weight:bold;
+
+  color:white;
+
+}
+
+.allow {
+
+  background:#15803d;
+
+}
+
+.back {
+
+  background:#555;
+
+}
+
+.hidden {
+
+  display:none !important;
+
+}
+
+.permissionBox {
+
+  text-align:center;
+
+  padding:20px;
+
+}
+
+.cameraIcon {
+
+  font-size:50px;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+
+<div class="header">
+
+<h1>
+📷 SCAN STUDENT QR
+</h1>
+
+</div>
+
+
+<div
+id="permissionScreen"
+class="permissionBox">
+
+<div class="cameraIcon">
+📷
+</div>
+
+<h2>
+Camera Access Required
+</h2>
+
+<p>
+To scan student's QR code,
+allow camera access.
+</p>
+
+<p>
+Tap the button below and select
+<b>Allow</b>.
+</p>
+
+
+<button
+class="allow"
+onclick="requestCameraPermission()">
+
+📷 ALLOW CAMERA ACCESS
+
+</button>
+
+</div>
+
+
+<div
+id="scannerArea"
+class="hidden">
+
+<div id="reader"></div>
+
+<div
+id="message"
+class="message">
+
+Starting camera...
+
+</div>
+
+</div>
+
+
+<button
+class="back"
+onclick="closePage()">
+
+← BACK
+
+</button>
+
+
+<script>
+
+
+/* =========================================
+   GET DATA FROM MAIN APP
+========================================= */
+
+const params =
+new URLSearchParams(
+window.location.search
+);
+
+
+const scannerName =
+params.get("scanner") || "";
+
+
+const deviceId =
+params.get("device") || "";
+
+
+/* =========================================
+   YOUR APPS SCRIPT URL
+========================================= */
+
+const APPS_SCRIPT_URL =
+"https://script.google.com/macros/s/AKfycbzu7SyLIvR2EqZ4RcWMoeYkDOdm4KDNZr2VZ5vzORvNyRwfFwIesN-ZlttvzMz6FIBk/exec";
+
+
+let scanner = null;
+
+let scanning = false;
+
+let scanLocked = false;
+
+
+/* =========================================
+   CAMERA PERMISSION
+========================================= */
+
+async function requestCameraPermission() {
+
+  try {
+
+    const stream =
+      await navigator.mediaDevices
+      .getUserMedia({
+
+        video:{
+          facingMode:{
+            ideal:"environment"
+          }
+        },
+
+        audio:false
+
+      });
+
+
+    stream
+      .getTracks()
+      .forEach(
+        track =>
+          track.stop()
+      );
+
+
+    document
+      .getElementById(
+        "permissionScreen"
+      )
+      .classList.add(
+        "hidden"
+      );
+
+
+    document
+      .getElementById(
+        "scannerArea"
+      )
+      .classList.remove(
+        "hidden"
+      );
+
+
+    document.getElementById(
+      "message"
+    ).innerHTML =
+      "Starting camera...";
+
+
+    startScanner();
+
+  }
+
+  catch(error) {
+
+    document.getElementById(
+      "message"
+    ).innerHTML =
+
+      "<div class='error'>" +
+
+      "❌ Camera permission denied." +
+
+      "<br><br>" +
+
+      "Please allow camera permission " +
+
+      "in Chrome settings." +
+
+      "</div>";
+
+  }
+
+}
+
+
+/* =========================================
+   START SCANNER
+========================================= */
+
+function startScanner() {
+
+  if (scanning) {
+    return;
+  }
+
+
+  scanner =
+    new Html5Qrcode(
+      "reader"
+    );
+
+
+  const config = {
+
+    fps:10,
+
+    qrbox:{
+      width:250,
+      height:250
+    }
+
+  };
+
+
+  scanner.start(
+
+    {
+      facingMode:"environment"
+    },
+
+    config,
+
+    onScanSuccess,
+
+    function(error) {}
+
+  )
+
+  .then(
+    function() {
+
+      scanning = true;
+
+      document.getElementById(
+        "message"
+      ).innerHTML =
+
+        "📷 Point camera at student's QR.";
+
+    }
+
+  )
+
+  .catch(
+    function(error) {
+
+      document.getElementById(
+        "message"
+      ).innerHTML =
+
+        "<div class='error'>" +
+
+        "❌ Camera could not be opened." +
+
+        "<br><br>" +
+
+        "Check Chrome camera permission." +
+
+        "</div>";
+
+    }
+  );
+
+}
+
+
+/* =========================================
+   QR SUCCESS
+========================================= */
+
+function onScanSuccess(
+  decodedText,
+  decodedResult
+) {
+
+  if (scanLocked) {
+    return;
+  }
+
+
+  scanLocked = true;
+
+
+  const suid =
+    String(
+      decodedText
+    ).trim();
+
+
+  document.getElementById(
+    "message"
+  ).innerHTML =
+
+    "<div class='success'>" +
+
+    "✓ QR SCANNED" +
+
+    "<br><br>" +
+
+    "SUID: " +
+
+    suid +
+
+    "<br><br>" +
+
+    "Saving attendance..." +
+
+    "</div>";
+
+
+  stopScanner();
+
+
+  const url =
+
+    APPS_SCRIPT_URL +
+
+    "?action=scan" +
+
+    "&suid=" +
+    encodeURIComponent(
+      suid
+    ) +
+
+    "&scanner=" +
+    encodeURIComponent(
+      scannerName
+    ) +
+
+    "&device=" +
+    encodeURIComponent(
+      deviceId
+    );
+
+
+  setTimeout(
+    function() {
+
+      window.location.href =
+        url;
+
+    },
+    500
+  );
+
+}
+
+
+/* =========================================
+   STOP
+========================================= */
+
+function stopScanner() {
+
+  if (!scanner) {
+    return;
+  }
+
+
+  scanner
+    .stop()
+    .then(
+      function() {
+
+        scanning = false;
+
+        scanner.clear();
+
+        scanner = null;
+
+      }
+    )
+    .catch(
+      function() {
+
+        scanning = false;
+
+        scanner = null;
+
+      }
+    );
+
+}
+
+
+/* =========================================
+   BACK
+========================================= */
+
+function closePage() {
+
+  stopScanner();
+
+  window.history.back();
+
+}
+
+</script>
+
+</body>
+
+</html>
