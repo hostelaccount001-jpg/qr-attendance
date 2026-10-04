@@ -32,17 +32,17 @@ body {
 
   background:#f5f7fb;
 
-  color:#111827;
-
   font-family:Arial,sans-serif;
+
+  color:#111827;
 
 }
 
 .header {
 
-  padding:22px 15px;
-
   text-align:center;
+
+  padding:20px 15px 10px;
 
 }
 
@@ -64,29 +64,17 @@ body {
 
 }
 
-.message {
+.permissionBox {
 
   text-align:center;
 
-  padding:15px;
-
-  font-size:18px;
+  padding:30px 20px;
 
 }
 
-.success {
+.cameraIcon {
 
-  color:#15803d;
-
-  font-weight:bold;
-
-}
-
-.error {
-
-  color:#b91c1c;
-
-  font-weight:bold;
+  font-size:55px;
 
 }
 
@@ -94,19 +82,19 @@ button {
 
   width:90%;
 
-  max-width:540px;
+  max-width:550px;
 
   display:block;
 
-  margin:14px auto;
+  margin:12px auto;
 
-  padding:20px;
+  padding:18px;
 
   border:0;
 
-  border-radius:16px;
+  border-radius:15px;
 
-  font-size:20px;
+  font-size:19px;
 
   font-weight:bold;
 
@@ -114,35 +102,55 @@ button {
 
 }
 
-.allow {
+.allowBtn {
 
   background:#15803d;
 
 }
 
-.back {
+.backBtn {
 
   background:#555;
+
+}
+
+.message {
+
+  text-align:center;
+
+  padding:12px;
+
+  font-size:20px;
+
+  font-weight:bold;
+
+  min-height:55px;
+
+}
+
+.success {
+
+  color:#15803d;
+
+}
+
+.error {
+
+  color:#b91c1c;
+
+}
+
+.name {
+
+  font-size:25px;
+
+  color:#111827;
 
 }
 
 .hidden {
 
   display:none !important;
-
-}
-
-.permissionBox {
-
-  text-align:center;
-
-  padding:20px;
-
-}
-
-.cameraIcon {
-
-  font-size:50px;
 
 }
 
@@ -162,6 +170,8 @@ button {
 </div>
 
 
+<!-- CAMERA PERMISSION -->
+
 <div
 id="permissionScreen"
 class="permissionBox">
@@ -175,19 +185,17 @@ Camera Access Required
 </h2>
 
 <p>
-To scan student's QR code,
-allow camera access.
-</p>
 
-<p>
-Tap the button below and select
-<b>Allow</b>.
+First time only:
+Allow camera access to scan
+student QR codes.
+
 </p>
 
 
 <button
-class="allow"
-onclick="requestCameraPermission()">
+class="allowBtn"
+onclick="requestCamera()">
 
 📷 ALLOW CAMERA ACCESS
 
@@ -195,6 +203,8 @@ onclick="requestCameraPermission()">
 
 </div>
 
+
+<!-- SCANNER -->
 
 <div
 id="scannerArea"
@@ -206,16 +216,18 @@ class="hidden">
 id="message"
 class="message">
 
-Starting camera...
+Ready...
 
 </div>
 
 </div>
 
+
+<!-- BACK -->
 
 <button
-class="back"
-onclick="closePage()">
+class="backBtn"
+onclick="goBack()">
 
 ← BACK
 
@@ -225,60 +237,76 @@ onclick="closePage()">
 <script>
 
 
-/* =========================================
-   GET DATA FROM MAIN APP
-========================================= */
+/* =================================================
+   VARIABLES
+================================================= */
 
-const params =
-new URLSearchParams(
-window.location.search
+let qrScanner =
+null;
+
+let scannerRunning =
+false;
+
+let scanLocked =
+false;
+
+
+/* =================================================
+   MESSAGE LISTENER
+================================================= */
+
+window.addEventListener(
+  "message",
+  function(event) {
+
+    if (
+      !event.data ||
+      typeof event.data !== "object"
+    ) {
+
+      return;
+
+    }
+
+
+    if (
+      event.data.type ===
+      "ATTENDANCE_RESULT"
+    ) {
+
+      showResult(
+        event.data
+      );
+
+    }
+
+  }
 );
 
 
-const scannerName =
-params.get("scanner") || "";
-
-
-const deviceId =
-params.get("device") || "";
-
-
-/* =========================================
-   YOUR APPS SCRIPT URL
-========================================= */
-
-const APPS_SCRIPT_URL =
-"https://script.google.com/macros/s/AKfycbzu7SyLIvR2EqZ4RcWMoeYkDOdm4KDNZr2VZ5vzORvNyRwfFwIesN-ZlttvzMz6FIBk/exec";
-
-
-let scanner = null;
-
-let scanning = false;
-
-let scanLocked = false;
-
-
-/* =========================================
+/* =================================================
    CAMERA PERMISSION
-========================================= */
+================================================= */
 
-async function requestCameraPermission() {
+async function requestCamera() {
 
   try {
 
     const stream =
-      await navigator.mediaDevices
-      .getUserMedia({
+      await navigator
+        .mediaDevices
+        .getUserMedia({
 
-        video:{
-          facingMode:{
-            ideal:"environment"
-          }
-        },
+          video: {
+            facingMode: {
+              ideal:
+                "environment"
+            }
+          },
 
-        audio:false
+          audio:false
 
-      });
+        });
 
 
     stream
@@ -307,51 +335,33 @@ async function requestCameraPermission() {
       );
 
 
-    document.getElementById(
-      "message"
-    ).innerHTML =
-      "Starting camera...";
-
-
     startScanner();
 
   }
 
   catch(error) {
 
-    document.getElementById(
-      "message"
-    ).innerHTML =
-
-      "<div class='error'>" +
-
-      "❌ Camera permission denied." +
-
-      "<br><br>" +
-
-      "Please allow camera permission " +
-
-      "in Chrome settings." +
-
-      "</div>";
+    alert(
+      "Camera permission was not allowed. Please select Allow in Chrome."
+    );
 
   }
 
 }
 
 
-/* =========================================
+/* =================================================
    START SCANNER
-========================================= */
+===================================================== */
 
 function startScanner() {
 
-  if (scanning) {
+  if (scannerRunning) {
     return;
   }
 
 
-  scanner =
+  qrScanner =
     new Html5Qrcode(
       "reader"
     );
@@ -361,7 +371,7 @@ function startScanner() {
 
     fps:10,
 
-    qrbox:{
+    qrbox: {
       width:250,
       height:250
     }
@@ -369,61 +379,65 @@ function startScanner() {
   };
 
 
-  scanner.start(
+  qrScanner
 
-    {
-      facingMode:"environment"
-    },
+    .start(
 
-    config,
+      {
+        facingMode:
+          "environment"
+      },
 
-    onScanSuccess,
+      config,
 
-    function(error) {}
+      onScanSuccess,
 
-  )
+      function(errorMessage) {}
 
-  .then(
-    function() {
+    )
 
-      scanning = true;
+    .then(
+      function() {
 
-      document.getElementById(
-        "message"
-      ).innerHTML =
+        scannerRunning =
+          true;
 
-        "📷 Point camera at student's QR.";
 
-    }
+        document
+          .getElementById(
+            "message"
+          )
+          .innerHTML =
 
-  )
+          "📷 Ready for next scan";
 
-  .catch(
-    function(error) {
+      }
+    )
 
-      document.getElementById(
-        "message"
-      ).innerHTML =
+    .catch(
+      function(error) {
 
-        "<div class='error'>" +
+        document
+          .getElementById(
+            "message"
+          )
+          .innerHTML =
 
-        "❌ Camera could not be opened." +
+          "<span class='error'>" +
 
-        "<br><br>" +
+          "❌ Camera could not be opened." +
 
-        "Check Chrome camera permission." +
+          "</span>";
 
-        "</div>";
-
-    }
-  );
+      }
+    );
 
 }
 
 
-/* =========================================
-   QR SUCCESS
-========================================= */
+/* =================================================
+   QR SCANNED
+===================================================== */
 
 function onScanSuccess(
   decodedText,
@@ -435,7 +449,8 @@ function onScanSuccess(
   }
 
 
-  scanLocked = true;
+  scanLocked =
+    true;
 
 
   const suid =
@@ -444,111 +459,279 @@ function onScanSuccess(
     ).trim();
 
 
-  document.getElementById(
-    "message"
-  ).innerHTML =
+  document
+    .getElementById(
+      "message"
+    )
+    .innerHTML =
 
-    "<div class='success'>" +
+    "<span>" +
 
-    "✓ QR SCANNED" +
+    "Checking..." +
 
-    "<br><br>" +
-
-    "SUID: " +
-
-    suid +
-
-    "<br><br>" +
-
-    "Saving attendance..." +
-
-    "</div>";
+    "</span>";
 
 
-  stopScanner();
+  /*
+
+    IMPORTANT:
+
+    Camera does NOT stop.
+
+    We only temporarily lock
+    another scan for a moment.
+
+  */
 
 
-  const url =
+  if (
+    window.opener
+  ) {
 
-    APPS_SCRIPT_URL +
+    window.opener.postMessage(
 
-    "?action=scan" +
+      {
 
-    "&suid=" +
-    encodeURIComponent(
-      suid
-    ) +
+        type:
+          "QR_SCANNED",
 
-    "&scanner=" +
-    encodeURIComponent(
-      scannerName
-    ) +
+        suid:
+          suid
 
-    "&device=" +
-    encodeURIComponent(
-      deviceId
+      },
+
+      "*"
+
     );
 
+  }
+  else {
+
+    document
+      .getElementById(
+        "message"
+      )
+      .innerHTML =
+
+      "<span class='error'>" +
+
+      "Please open scanner from Attendance App."
+
+      + "</span>";
+
+    scanLocked =
+      false;
+
+  }
+
+}
+
+
+/* =================================================
+   SHOW RESULT
+===================================================== */
+
+function showResult(
+  result
+) {
+
+  let html = "";
+
+
+  if (
+    result.success
+  ) {
+
+    html =
+
+      "<span class='success'>" +
+
+      "✓ SCAN SUCCESS" +
+
+      "<br>" +
+
+      "<span class='name'>" +
+
+      escapeHtml(
+        result.name
+      ) +
+
+      "</span>" +
+
+      "</span>";
+
+  }
+
+  else if (
+    result.duplicate
+  ) {
+
+    html =
+
+      "<span>" +
+
+      "✓ " +
+
+      "<span class='name'>" +
+
+      escapeHtml(
+        result.name
+      ) +
+
+      "</span>" +
+
+      "<br>" +
+
+      "<span style='color:#b45309;font-size:16px'>" +
+
+      "Already marked"
+
+      + "</span>" +
+
+      "</span>";
+
+  }
+
+  else {
+
+    html =
+
+      "<span class='error'>" +
+
+      escapeHtml(
+        result.message ||
+        "Student not found"
+      ) +
+
+      "</span>";
+
+  }
+
+
+  document
+    .getElementById(
+      "message"
+    )
+    .innerHTML =
+      html;
+
+
+  /*
+
+    Keep scanner open.
+
+    After 1.5 seconds,
+    allow next scan.
+
+  */
 
   setTimeout(
     function() {
 
-      window.location.href =
-        url;
+      scanLocked =
+        false;
+
+
+      document
+        .getElementById(
+          "message"
+        )
+        .innerHTML =
+
+        "📷 Ready for next scan";
 
     },
-    500
+    1500
   );
 
 }
 
 
-/* =========================================
-   STOP
-========================================= */
+/* =================================================
+   BACK
+===================================================== */
 
-function stopScanner() {
+function goBack() {
 
-  if (!scanner) {
-    return;
+  if (
+    qrScanner &&
+    scannerRunning
+  ) {
+
+    qrScanner
+      .stop()
+      .then(
+        function() {
+
+          scannerRunning =
+            false;
+
+          window.close();
+
+        }
+      )
+      .catch(
+        function() {
+
+          window.close();
+
+        }
+      );
+
   }
+  else {
 
+    window.close();
 
-  scanner
-    .stop()
-    .then(
-      function() {
-
-        scanning = false;
-
-        scanner.clear();
-
-        scanner = null;
-
-      }
-    )
-    .catch(
-      function() {
-
-        scanning = false;
-
-        scanner = null;
-
-      }
-    );
+  }
 
 }
 
 
-/* =========================================
-   BACK
-========================================= */
+/* =================================================
+   ESCAPE
+===================================================== */
 
-function closePage() {
+function escapeHtml(
+  value
+) {
 
-  stopScanner();
+  if (
+    value === null ||
+    value === undefined
+  ) {
 
-  window.history.back();
+    return "";
+
+  }
+
+
+  return String(value)
+
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+
+    .replace(
+      /</g,
+      "&lt;"
+    )
+
+    .replace(
+      />/g,
+      "&gt;"
+    )
+
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+
+    .replace(
+      /'/g,
+      "&#039;"
+    );
 
 }
 
