@@ -1,742 +1,131 @@
 <!DOCTYPE html>
-
 <html>
-
 <head>
-
-<meta charset="UTF-8">
-
-<meta name="viewport"
-content="width=device-width,
-initial-scale=1.0,
-maximum-scale=1.0,
-user-scalable=no">
-
-<title>QR Scanner</title>
-
-<script
-src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js">
-</script>
-
-<style>
-
-* {
-  box-sizing:border-box;
-}
-
-body {
-
-  margin:0;
-
-  min-height:100vh;
-
-  background:#f5f7fb;
-
-  font-family:Arial,sans-serif;
-
-  color:#111827;
-
-}
-
-.header {
-
-  text-align:center;
-
-  padding:20px 15px 10px;
-
-}
-
-.header h1 {
-
-  margin:0;
-
-  font-size:28px;
-
-}
-
-#reader {
-
-  width:100%;
-
-  max-width:600px;
-
-  margin:auto;
-
-}
-
-.permissionBox {
-
-  text-align:center;
-
-  padding:30px 20px;
-
-}
-
-.cameraIcon {
-
-  font-size:55px;
-
-}
-
-button {
-
-  width:90%;
-
-  max-width:550px;
-
-  display:block;
-
-  margin:12px auto;
-
-  padding:18px;
-
-  border:0;
-
-  border-radius:15px;
-
-  font-size:19px;
-
-  font-weight:bold;
-
-  color:white;
-
-}
-
-.allowBtn {
-
-  background:#15803d;
-
-}
-
-.backBtn {
-
-  background:#555;
-
-}
-
-.message {
-
-  text-align:center;
-
-  padding:12px;
-
-  font-size:20px;
-
-  font-weight:bold;
-
-  min-height:55px;
-
-}
-
-.success {
-
-  color:#15803d;
-
-}
-
-.error {
-
-  color:#b91c1c;
-
-}
-
-.name {
-
-  font-size:25px;
-
-  color:#111827;
-
-}
-
-.hidden {
-
-  display:none !important;
-
-}
-
-</style>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Scanner</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    *{box-sizing:border-box;font-family:Arial,sans-serif}
+    body{margin:0;background:#111827;color:white;min-height:100vh}
+    .wrap{max-width:520px;margin:auto;padding:14px}
+    .top{background:white;color:#111827;border-radius:18px;padding:12px;text-align:center;margin-bottom:12px}
+    #status{font-size:22px;font-weight:900;min-height:30px}
+    #scanner{background:white;border-radius:18px;overflow:hidden}
+    .hint{text-align:center;color:#cbd5e1;font-size:13px;margin:10px 0}
+    .back{width:100%;border:0;border-radius:14px;padding:16px;background:#4b5563;color:white;font-size:18px;font-weight:800;margin-top:12px}
+    .ok{color:#15803d}
+    .bad{color:#b91c1c}
+  </style>
 </head>
-
 <body>
+<div class="wrap">
+  <div class="top">
+    <div id="status">📷 READY</div>
+    <div class="hint">Only 6-digit SUID QR is accepted</div>
+  </div>
 
+  <div id="scanner"></div>
 
-<div class="header">
-
-<h1>
-📷 SCAN STUDENT QR
-</h1>
-
+  <button class="back" onclick="goBack()">← BACK</button>
 </div>
-
-
-<!-- CAMERA PERMISSION -->
-
-<div
-id="permissionScreen"
-class="permissionBox">
-
-<div class="cameraIcon">
-📷
-</div>
-
-<h2>
-Camera Access Required
-</h2>
-
-<p>
-
-First time only:
-Allow camera access to scan
-student QR codes.
-
-</p>
-
-
-<button
-class="allowBtn"
-onclick="requestCamera()">
-
-📷 ALLOW CAMERA ACCESS
-
-</button>
-
-</div>
-
-
-<!-- SCANNER -->
-
-<div
-id="scannerArea"
-class="hidden">
-
-<div id="reader"></div>
-
-<div
-id="message"
-class="message">
-
-Ready...
-
-</div>
-
-</div>
-
-
-<!-- BACK -->
-
-<button
-class="backBtn"
-onclick="goBack()">
-
-← BACK
-
-</button>
-
 
 <script>
+let scanner = null;
+let lastSuid = '';
+let lastScanTime = 0;
+let busy = false;
 
-
-/* =================================================
-   VARIABLES
-================================================= */
-
-let qrScanner =
-null;
-
-let scannerRunning =
-false;
-
-let scanLocked =
-false;
-
-
-/* =================================================
-   MESSAGE LISTENER
-================================================= */
-
-window.addEventListener(
-  "message",
-  function(event) {
-
-    if (
-      !event.data ||
-      typeof event.data !== "object"
-    ) {
-
-      return;
-
-    }
-
-
-    if (
-      event.data.type ===
-      "ATTENDANCE_RESULT"
-    ) {
-
-      showResult(
-        event.data
-      );
-
-    }
-
-  }
-);
-
-
-/* =================================================
-   CAMERA PERMISSION
-================================================= */
-
-async function requestCamera() {
-
-  try {
-
-    const stream =
-      await navigator
-        .mediaDevices
-        .getUserMedia({
-
-          video: {
-            facingMode: {
-              ideal:
-                "environment"
-            }
-          },
-
-          audio:false
-
-        });
-
-
-    stream
-      .getTracks()
-      .forEach(
-        track =>
-          track.stop()
-      );
-
-
-    document
-      .getElementById(
-        "permissionScreen"
-      )
-      .classList.add(
-        "hidden"
-      );
-
-
-    document
-      .getElementById(
-        "scannerArea"
-      )
-      .classList.remove(
-        "hidden"
-      );
-
-
-    startScanner();
-
-  }
-
-  catch(error) {
-
-    alert(
-      "Camera permission was not allowed. Please select Allow in Chrome."
-    );
-
-  }
-
+function setStatus(text, good) {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = good ? 'ok' : 'bad';
 }
 
+function onScanSuccess(decodedText) {
+  const suid = String(decodedText || '').trim();
 
-/* =================================================
-   START SCANNER
-===================================================== */
+  // STRICT: exactly 6 numeric digits.
+  if (!/^\d{6}$/.test(suid)) {
+    setStatus('❌ INVALID QR', false);
+    return;
+  }
+
+  // Prevent the same QR from firing many times immediately.
+  const now = Date.now();
+  if (busy || (suid === lastSuid && now - lastScanTime < 1800)) {
+    return;
+  }
+
+  busy = true;
+  lastSuid = suid;
+  lastScanTime = now;
+
+  // Only show DONE; no student name.
+  setStatus('✓ DONE', true);
+
+  if (window.opener && !window.opener.closed) {
+    window.opener.postMessage({
+      type: 'QR_ATTENDANCE_SCAN',
+      suid: suid
+    }, '*');
+  }
+
+  // Keep camera running. Allow the next scan shortly.
+  setTimeout(function() {
+    busy = false;
+    setStatus('📷 READY', true);
+  }, 900);
+}
+
+function onScanFailure(errorMessage) {
+  // Normal camera scanning produces many "not found" messages.
+  // Do not show them to the user.
+}
 
 function startScanner() {
-
-  if (scannerRunning) {
-    return;
-  }
-
-
-  qrScanner =
-    new Html5Qrcode(
-      "reader"
-    );
-
-
-  const config = {
-
-    fps:10,
-
-    qrbox: {
-      width:250,
-      height:250
-    }
-
-  };
-
-
-  qrScanner
-
-    .start(
-
-      {
-        facingMode:
-          "environment"
-      },
-
-      config,
-
-      onScanSuccess,
-
-      function(errorMessage) {}
-
-    )
-
-    .then(
-      function() {
-
-        scannerRunning =
-          true;
-
-
-        document
-          .getElementById(
-            "message"
-          )
-          .innerHTML =
-
-          "📷 Ready for next scan";
-
-      }
-    )
-
-    .catch(
-      function(error) {
-
-        document
-          .getElementById(
-            "message"
-          )
-          .innerHTML =
-
-          "<span class='error'>" +
-
-          "❌ Camera could not be opened." +
-
-          "</span>";
-
-      }
-    );
-
-}
-
-
-/* =================================================
-   QR SCANNED
-===================================================== */
-
-function onScanSuccess(
-  decodedText,
-  decodedResult
-) {
-
-  if (scanLocked) {
-    return;
-  }
-
-
-  scanLocked =
-    true;
-
-
-  const suid =
-    String(
-      decodedText
-    ).trim();
-
-
-  document
-    .getElementById(
-      "message"
-    )
-    .innerHTML =
-
-    "<span>" +
-
-    "Checking..." +
-
-    "</span>";
-
-
-  /*
-
-    IMPORTANT:
-
-    Camera does NOT stop.
-
-    We only temporarily lock
-    another scan for a moment.
-
-  */
-
-
-  if (
-    window.opener
-  ) {
-
-    window.opener.postMessage(
-
-      {
-
-        type:
-          "QR_SCANNED",
-
-        suid:
-          suid
-
-      },
-
-      "*"
-
-    );
-
-  }
-  else {
-
-    document
-      .getElementById(
-        "message"
-      )
-      .innerHTML =
-
-      "<span class='error'>" +
-
-      "Please open scanner from Attendance App."
-
-      + "</span>";
-
-    scanLocked =
-      false;
-
-  }
-
-}
-
-
-/* =================================================
-   SHOW RESULT
-===================================================== */
-
-function showResult(
-  result
-) {
-
-  let html = "";
-
-
-  if (
-    result.success
-  ) {
-
-    html =
-
-      "<span class='success'>" +
-
-      "✓ SCAN SUCCESS" +
-
-      "<br>" +
-
-      "<span class='name'>" +
-
-      escapeHtml(
-        result.name
-      ) +
-
-      "</span>" +
-
-      "</span>";
-
-  }
-
-  else if (
-    result.duplicate
-  ) {
-
-    html =
-
-      "<span>" +
-
-      "✓ " +
-
-      "<span class='name'>" +
-
-      escapeHtml(
-        result.name
-      ) +
-
-      "</span>" +
-
-      "<br>" +
-
-      "<span style='color:#b45309;font-size:16px'>" +
-
-      "Already marked"
-
-      + "</span>" +
-
-      "</span>";
-
-  }
-
-  else {
-
-    html =
-
-      "<span class='error'>" +
-
-      escapeHtml(
-        result.message ||
-        "Student not found"
-      ) +
-
-      "</span>";
-
-  }
-
-
-  document
-    .getElementById(
-      "message"
-    )
-    .innerHTML =
-      html;
-
-
-  /*
-
-    Keep scanner open.
-
-    After 1.5 seconds,
-    allow next scan.
-
-  */
-
-  setTimeout(
-    function() {
-
-      scanLocked =
-        false;
-
-
-      document
-        .getElementById(
-          "message"
-        )
-        .innerHTML =
-
-        "📷 Ready for next scan";
-
+  scanner = new Html5Qrcode("scanner");
+
+  scanner.start(
+    { facingMode: "environment" },
+    {
+      fps: 15,
+      qrbox: { width: 260, height: 260 },
+      aspectRatio: 1.0
     },
-    1500
-  );
-
+    onScanSuccess,
+    onScanFailure
+  ).catch(function(err) {
+    setStatus('❌ CAMERA ERROR', false);
+  });
 }
-
-
-/* =================================================
-   BACK
-===================================================== */
 
 function goBack() {
-
-  if (
-    qrScanner &&
-    scannerRunning
-  ) {
-
-    qrScanner
-      .stop()
-      .then(
-        function() {
-
-          scannerRunning =
-            false;
-
-          window.close();
-
-        }
-      )
-      .catch(
-        function() {
-
-          window.close();
-
-        }
-      );
-
-  }
-  else {
-
+  if (scanner) {
+    scanner.stop()
+      .catch(function(){})
+      .finally(function() {
+        window.close();
+      });
+  } else {
     window.close();
-
   }
-
 }
 
+window.addEventListener('message', function(event) {
+  if (!event.data || event.data.type !== 'QR_ATTENDANCE_RESULT') return;
 
-/* =================================================
-   ESCAPE
-===================================================== */
-
-function escapeHtml(
-  value
-) {
-
-  if (
-    value === null ||
-    value === undefined
-  ) {
-
-    return "";
-
+  if (event.data.ok) {
+    setStatus('✓ DONE', true);
+  } else {
+    setStatus('❌ ' + (event.data.message || 'NOT SAVED'), false);
   }
 
+  setTimeout(function() {
+    setStatus('📷 READY', true);
+  }, 900);
+});
 
-  return String(value)
-
-    .replace(
-      /&/g,
-      "&amp;"
-    )
-
-    .replace(
-      /</g,
-      "&lt;"
-    )
-
-    .replace(
-      />/g,
-      "&gt;"
-    )
-
-    .replace(
-      /"/g,
-      "&quot;"
-    )
-
-    .replace(
-      /'/g,
-      "&#039;"
-    );
-
-}
-
+startScanner();
 </script>
-
 </body>
-
 </html>
